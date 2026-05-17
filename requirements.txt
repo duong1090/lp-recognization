@@ -3,6 +3,8 @@ uvicorn[standard]==0.30.*
 python-multipart==0.0.9
 pydantic==2.*
 pydantic-settings==2.*
+matplotlib
+pandas
 psutil
 thop
 tqdm
