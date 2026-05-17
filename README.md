@@ -83,14 +83,17 @@ curl -s -X POST http://localhost:8000/recognize/batch \
 
 ## Build & run on Jetson Orin Nano
 
-1. Confirm the L4T release on the device and adjust the Dockerfile `FROM`
-   tag if needed:
+1. Confirm the L4T release on the device:
 
    ```bash
    cat /etc/nv_tegra_release
-   # JetPack 6  → nvcr.io/nvidia/l4t-pytorch:r36.2.0-pth2.2-py3 (default)
-   # JetPack 5  → nvcr.io/nvidia/l4t-pytorch:r35.2.1-pth2.0-py3
+   # JetPack 6 / L4T r36  → nvcr.io/nvidia/l4t-ml:r36.2.0-py3 (default)
+   # JetPack 5 / L4T r35  → switch FROM to nvcr.io/nvidia/l4t-pytorch:r35.2.1-pth2.0-py3
    ```
+
+   The default base (`l4t-ml:r36.2.0-py3`) is ~12 GB; first pull on the
+   Jetson will take a while. It ships PyTorch + torchvision + OpenCV +
+   numpy + pandas pre-built for L4T r36, so the service install is fast.
 
 2. Build from the `service/` directory (build context is self-contained):
 

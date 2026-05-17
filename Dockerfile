@@ -1,6 +1,8 @@
-# Jetson Orin Nano: JetPack 6 / L4T r36.x with PyTorch 2.2
-# If on JetPack 5.x use: nvcr.io/nvidia/l4t-pytorch:r35.2.1-pth2.0-py3
-FROM nvcr.io/nvidia/l4t-pytorch:r36.2.0-pth2.2-py3
+# Jetson Orin Nano, JetPack 6 / L4T r36.x.
+# l4t-ml bundles PyTorch + torchvision + OpenCV + numpy + pandas for L4T.
+# (NVIDIA's l4t-pytorch repo has no r36 tags; l4t-ml is the JetPack-6 successor.)
+# For JetPack 5 use: nvcr.io/nvidia/l4t-pytorch:r35.2.1-pth2.0-py3
+FROM nvcr.io/nvidia/l4t-ml:r36.2.0-py3
 
 ENV DEBIAN_FRONTEND=noninteractive \
     PYTHONUNBUFFERED=1 \
@@ -22,7 +24,10 @@ RUN git clone https://github.com/ultralytics/yolov5.git /opt/lp/yolov5 \
 WORKDIR /opt/lp/service
 
 COPY requirements.txt ./requirements.txt
-RUN pip3 install --no-deps -r requirements.txt
+# Resolve deps normally — the base image already has torch/torchvision/numpy/
+# opencv/pandas, so pip will skip those and only install the FastAPI side and
+# yolov5 v6.1's small runtime helpers.
+RUN pip3 install -r requirements.txt
 
 # Service code + helper functions + pre-trained weights (all bundled).
 COPY app ./app
