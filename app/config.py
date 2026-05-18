@@ -27,5 +27,7 @@ class Settings(BaseSettings):
     max_batch: int = 8
     max_image_bytes: int = 10_000_000
 
+    rtsp_reconnect_max: int = 3
+
 
 settings = Settings()

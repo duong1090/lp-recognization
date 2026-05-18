@@ -19,14 +19,46 @@ service/
 
 ## Endpoints
 
-| Method | Path               | Body                                | Response                                          |
-|--------|--------------------|-------------------------------------|---------------------------------------------------|
-| GET    | `/healthz`         | –                                   | `{status, device, cuda_available, models_loaded}` |
-| POST   | `/recognize`       | `multipart/form-data` field `file`  | `text/plain`, e.g. `30A-12345` or `unknown`       |
-| POST   | `/recognize/batch` | `multipart/form-data` field `files` | `{"plates": ["30A-12345", "unknown", ...]}`       |
+| Method | Path               | Body                                    | Response                                            |
+|--------|--------------------|-----------------------------------------|-----------------------------------------------------|
+| GET    | `/healthz`         | –                                       | `{status, device, cuda_available, models_loaded}`   |
+| POST   | `/recognize`       | `multipart/form-data` field `file`      | `text/plain`, e.g. `30A-12345` or `unknown`         |
+| POST   | `/recognize/batch` | `multipart/form-data` field `files`     | `{"plates": ["30A-12345", "unknown", ...]}`         |
+| WS     | `/ws/rtsp`         | JSON init: `{"rtsp_url": "rtsp://..."}` | Stream of JSON: `{plate, frame_id, ts, latency_ms}` |
 
 `/recognize` returns a plain-text body (per the service contract). `/recognize/batch`
 preserves input order in the `plates` array.
+
+### `/ws/rtsp` — real-time recognition over WebSocket
+
+Connect, send a single init message with the camera's RTSP URL, then receive
+one JSON result per processed frame. The service opens the RTSP stream itself
+with `cv2.VideoCapture` and reads frames in a background thread; if inference
+can't keep up, intermediate frames are dropped (you'll see `frame_id` jump)
+so latency stays bounded.
+
+Only **one concurrent stream per worker** is supported (matches the existing
+single-worker / `INFERENCE_LOCK` design). A second connection receives
+`{"error": "busy"}` and a WS close with code `1013`.
+
+Error payloads:
+
+| `error`             | When                                                          |
+|---------------------|---------------------------------------------------------------|
+| `bad_init`          | The first message wasn't a valid `{rtsp_url}` JSON object.    |
+| `busy`              | Another stream is already active on this worker.              |
+| `rtsp_open_failed`  | `cv2.VideoCapture` couldn't open the URL.                     |
+| `stream_lost`       | Reader exhausted `RTSP_RECONNECT_MAX` reconnect attempts.     |
+
+Quick smoke test with [`websocat`](https://github.com/vi/websocat):
+
+```bash
+websocat ws://localhost:8000/ws/rtsp
+{"rtsp_url":"rtsp://your-camera/stream"}
+# → {"plate":"30A-12345","frame_id":42,"ts":1716000000.12,"latency_ms":58.3}
+# → {"plate":"unknown","frame_id":44,"ts":1716000000.18,"latency_ms":55.1}
+# ...
+```
 
 ## Bundled weights
 
@@ -155,6 +187,7 @@ Env vars (defaults shown):
 | `DEVICE`              | `cuda`                                               | Falls back to CPU if CUDA missing    |
 | `MAX_BATCH`           | `8`                                                  | Max images per batch request         |
 | `MAX_IMAGE_BYTES`     | `10000000`                                           | Per-image size cap (10 MB)           |
+| `RTSP_RECONNECT_MAX`  | `3`                                                  | `/ws/rtsp` reconnect attempts        |
 
 ## Notes & caveats
 
