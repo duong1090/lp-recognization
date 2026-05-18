@@ -9,6 +9,7 @@ from app.model_loader import INFERENCE_LOCK, LoadedModels
 # These imports resolve because model_loader._ensure_upstream_on_path()
 # inserts License-Plate-Recognition/ onto sys.path at startup.
 from function.helper import read_plate
+from function.preprocess import enhance_for_ocr
 from function.utils_rotate import deskew
 
 UNKNOWN = "unknown"
@@ -51,6 +52,10 @@ def recognize_best(models: LoadedModels, img_bgr: np.ndarray) -> str:
             lp = _ocr_with_rotations(models.ocr, crop)
             if lp != UNKNOWN:
                 return lp
+            if settings.ocr_preprocess:
+                lp = _ocr_with_rotations(models.ocr, enhance_for_ocr(crop))
+                if lp != UNKNOWN:
+                    return lp
         return UNKNOWN
 
 

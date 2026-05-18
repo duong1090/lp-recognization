@@ -185,6 +185,7 @@ Env vars (defaults shown):
 | `OCR_CONF`            | `0.60`                                               | Min confidence for OCR detections    |
 | `DETECTOR_IMGSZ`      | `640`                                                | YOLO inference resolution            |
 | `DEVICE`              | `cuda`                                               | Falls back to CPU if CUDA missing    |
+| `OCR_PREPROCESS`      | `true`                                               | OCR fallback (CLAHE+bilat+upscale)    |
 | `MAX_BATCH`           | `8`                                                  | Max images per batch request         |
 | `MAX_IMAGE_BYTES`     | `10000000`                                           | Per-image size cap (10 MB)           |
 | `RTSP_RECONNECT_MAX`  | `3`                                                  | `/ws/rtsp` reconnect attempts        |

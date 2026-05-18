@@ -24,6 +24,8 @@ class Settings(BaseSettings):
     detector_imgsz: int = 640
     device: str = "cuda"
 
+    ocr_preprocess: bool = True
+
     max_batch: int = 8
     max_image_bytes: int = 10_000_000
 
