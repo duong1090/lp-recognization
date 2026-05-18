@@ -5,6 +5,8 @@ pydantic==2.*
 pydantic-settings==2.*
 matplotlib
 pandas
+seaborn
+gitpython
 psutil
 thop
 tqdm

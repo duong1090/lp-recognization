@@ -23,11 +23,13 @@ RUN git clone https://github.com/ultralytics/yolov5.git /opt/lp/yolov5 \
 
 WORKDIR /opt/lp/service
 
+# Resolve deps — freeze numpy/torch from the base image so pip doesn't
+# overwrite them with versions incompatible with Jetson CUDA.
 COPY requirements.txt ./requirements.txt
-# Resolve deps normally — the base image already has torch/torchvision/numpy/
-# opencv/pandas, so pip will skip those and only install the FastAPI side and
-# yolov5 v6.1's small runtime helpers.
-RUN pip3 install -r requirements.txt
+RUN NUMPY_VER=$(python3 -c "import numpy; print(numpy.__version__)") && \
+    TORCH_VER=$(python3 -c "import torch; print(torch.__version__)") && \
+    printf "numpy==${NUMPY_VER}\ntorch==${TORCH_VER}\n" > /tmp/constraints.txt && \
+    pip3 install -r requirements.txt -c /tmp/constraints.txt
 
 # Service code + helper functions + pre-trained weights (all bundled).
 COPY app ./app
