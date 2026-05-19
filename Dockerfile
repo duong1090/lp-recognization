@@ -9,17 +9,17 @@ ENV DEBIAN_FRONTEND=noninteractive \
     PIP_NO_CACHE_DIR=1
 
 RUN apt-get update && apt-get install -y --no-install-recommends \
-      git \
-      libgl1 \
-      libglib2.0-0 \
-      ca-certificates \
+    git \
+    libgl1 \
+    libglib2.0-0 \
+    ca-certificates \
     && rm -rf /var/lib/apt/lists/*
 
 # YOLOv5 v6.1 pinned — matches the .pt files trained against this release.
 ARG YOLOV5_SHA=3752807c0b8af03d42de478fbcbf338ec4546a6c
 RUN git clone https://github.com/ultralytics/yolov5.git /opt/lp/yolov5 \
- && git -C /opt/lp/yolov5 checkout ${YOLOV5_SHA} \
- && rm -rf /opt/lp/yolov5/.git
+    && git -C /opt/lp/yolov5 checkout ${YOLOV5_SHA} \
+    && rm -rf /opt/lp/yolov5/.git
 
 WORKDIR /opt/lp/service
 
