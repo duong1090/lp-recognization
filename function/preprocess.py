@@ -1,10 +1,13 @@
 """OpenCV preprocessing for plate crops before OCR.
 
 Applied as a fallback when raw-crop OCR returns 'unknown'. Order:
-upscale (more pixels for later stages) → polarity normalize (invert dark-
-background plates so characters appear dark-on-light, matching the OCR
-model's dominant training distribution) → bilateral denoise → CLAHE on
-the LAB L-channel.
+upscale (more pixels for later stages) → optional polarity inversion
+(for dark-background plates such as blue government / red military) →
+bilateral denoise → CLAHE on the LAB L-channel.
+
+The caller (pipeline.recognize_best) runs this twice on hard crops:
+once with invert=False and once with invert=True — that pair covers both
+training-distribution polarities without a brittle auto-detect heuristic.
 """
 
 import logging
@@ -19,12 +22,9 @@ _UPSCALE_FACTOR = 2.0
 _BILATERAL = dict(d=5, sigmaColor=50, sigmaSpace=50)
 _CLAHE_CLIP = 2.0
 _CLAHE_TILES = (8, 8)
-# Median grayscale value below which we treat the crop as dark-background
-# (blue government / red military plates). Tuned for Vietnamese plates.
-_DARK_BG_MEDIAN_THRESHOLD = 127
 
 
-def enhance_for_ocr(crop_bgr: np.ndarray) -> np.ndarray:
+def enhance_for_ocr(crop_bgr: np.ndarray, *, invert: bool = False) -> np.ndarray:
     img = crop_bgr
     h, w = img.shape[:2]
     upscaled = False
@@ -36,10 +36,7 @@ def enhance_for_ocr(crop_bgr: np.ndarray) -> np.ndarray:
         )
         upscaled = True
 
-    gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
-    median_v = float(np.median(gray))
-    inverted = median_v < _DARK_BG_MEDIAN_THRESHOLD
-    if inverted:
+    if invert:
         img = cv2.bitwise_not(img)
 
     img = cv2.bilateralFilter(img, **_BILATERAL)
@@ -49,7 +46,7 @@ def enhance_for_ocr(crop_bgr: np.ndarray) -> np.ndarray:
     l_channel = clahe.apply(l_channel)
     out = cv2.cvtColor(cv2.merge((l_channel, a, b)), cv2.COLOR_LAB2BGR)
     logger.info(
-        "enhance: %dx%d -> %dx%d (upscale=%s, invert=%s, median=%.0f)",
-        w, h, out.shape[1], out.shape[0], upscaled, inverted, median_v,
+        "enhance: %dx%d -> %dx%d (upscale=%s, invert=%s)",
+        w, h, out.shape[1], out.shape[0], upscaled, invert,
     )
     return out

@@ -83,6 +83,18 @@ def recognize_best(models: LoadedModels, img_bgr: np.ndarray) -> str:
                     logger.info("recognize -> %s (crop[%d], preprocessed)", lp, idx)
                     return lp
 
+                logger.info("crop[%d]: preprocessed failed, trying inverted", idx)
+                lp = _ocr_with_rotations(
+                    models.ocr,
+                    enhance_for_ocr(crop, invert=True),
+                    label="prep-inv",
+                )
+                if lp != UNKNOWN:
+                    logger.info(
+                        "recognize -> %s (crop[%d], preprocessed+inverted)", lp, idx
+                    )
+                    return lp
+
         logger.info("recognize -> unknown (all candidates exhausted)")
         return UNKNOWN
 
