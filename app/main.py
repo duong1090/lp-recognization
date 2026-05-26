@@ -127,17 +127,27 @@ async def ws_rtsp(websocket: WebSocket) -> None:
             frame_id, frame = latest
             last_id = frame_id
             t0 = time.perf_counter()
-            plate = await run_in_threadpool(
-                pipeline.recognize_best, app.state.models, frame
+            result = await run_in_threadpool(
+                pipeline.recognize_best_with_bbox, app.state.models, frame
             )
-            await websocket.send_json(
-                {
-                    "plate": plate,
-                    "frame_id": frame_id,
-                    "ts": time.time(),
-                    "latency_ms": round((time.perf_counter() - t0) * 1000, 1),
+            h, w = frame.shape[:2]
+            msg = {
+                "plate": result.plate,
+                "frame_id": frame_id,
+                "ts": time.time(),
+                "latency_ms": round((time.perf_counter() - t0) * 1000, 1),
+                "confidence": result.confidence,
+                "frame_width": w,
+                "frame_height": h,
+            }
+            if result.bbox:
+                msg["bbox"] = {
+                    "x1": result.bbox[0],
+                    "y1": result.bbox[1],
+                    "x2": result.bbox[2],
+                    "y2": result.bbox[3],
                 }
-            )
+            await websocket.send_json(msg)
     except WebSocketDisconnect:
         logger.info("ws client disconnected")
     finally:
