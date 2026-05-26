@@ -21,6 +21,13 @@ RUN git clone https://github.com/ultralytics/yolov5.git /opt/lp/yolov5 \
     && git -C /opt/lp/yolov5 checkout ${YOLOV5_SHA} \
     && rm -rf /opt/lp/yolov5/.git
 
+# Pre-download Arial.ttf so YOLOv5 doesn't try to fetch it at runtime.
+# Python's urllib doesn't follow HTTP 308 redirects; curl does.
+RUN mkdir -p /root/.config/Ultralytics \
+    && curl -fsSL --max-redirs 10 \
+       "https://ultralytics.com/assets/Arial.ttf" \
+       -o /root/.config/Ultralytics/Arial.ttf
+
 WORKDIR /opt/lp/service
 
 # Resolve deps — freeze numpy/torch from the base image so pip doesn't
