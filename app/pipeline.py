@@ -30,16 +30,17 @@ def _detect(detector, img_bgr: np.ndarray):
     return detector(img_bgr, size=settings.detector_imgsz)
 
 
-def _ocr_with_rotations(ocr, crop: np.ndarray, *, label: str) -> str:
+def _ocr_with_rotations(ocr, crop: np.ndarray, *, label: str, verbose: bool = True) -> str:
     ch, cw = crop.shape[:2]
     for change_contrast in (0, 1):
         for center_thres in (0, 1):
             deskewed = deskew(crop, change_contrast, center_thres)
             lp = read_plate(ocr, deskewed)
-            logger.info(
-                "ocr[%s] contrast=%d center=%d size=%dx%d -> %s",
-                label, change_contrast, center_thres, cw, ch, lp,
-            )
+            if verbose:
+                logger.info(
+                    "ocr[%s] contrast=%d center=%d size=%dx%d -> %s",
+                    label, change_contrast, center_thres, cw, ch, lp,
+                )
             if lp != UNKNOWN:
                 return lp
     return UNKNOWN
@@ -107,21 +108,22 @@ def recognize_best(models: LoadedModels, img_bgr: np.ndarray) -> str:
         return UNKNOWN
 
 
-def recognize_best_with_bbox(models: LoadedModels, img_bgr: np.ndarray) -> RecognitionResult:
+def recognize_best_with_bbox(
+    models: LoadedModels, img_bgr: np.ndarray, *, verbose: bool = True
+) -> RecognitionResult:
     """Same as recognize_best but returns bbox and confidence alongside the plate."""
     with INFERENCE_LOCK, torch.no_grad():
         h, w = img_bgr.shape[:2]
-        logger.info("recognize_bbox: input %dx%d", w, h)
 
         plates = _detect(models.detector, img_bgr)
         df = plates.pandas().xyxy[0]
-        logger.info("detect: %d candidate(s)", len(df))
 
         if df.empty:
             lp = read_plate(models.ocr, img_bgr)
-            logger.info("recognize_bbox -> %s (whole-frame fallback)", lp)
             return RecognitionResult(plate=lp)
 
+        # Only reached when at least one candidate found — always log this
+        logger.info("detect: %d candidate(s) [%dx%d]", len(df), w, h)
         df = df.sort_values("confidence", ascending=False)
         for idx, (_, row) in enumerate(df.iterrows()):
             x1 = max(int(row["xmin"]), 0)
@@ -130,19 +132,25 @@ def recognize_best_with_bbox(models: LoadedModels, img_bgr: np.ndarray) -> Recog
             y2 = min(int(row["ymax"]), h)
             conf = float(row["confidence"])
             if x2 <= x1 or y2 <= y1:
-                logger.info("crop[%d]: degenerate bbox, skipped", idx)
+                if verbose:
+                    logger.info("crop[%d]: degenerate bbox, skipped", idx)
                 continue
             crop = img_bgr[y1:y2, x1:x2]
             bbox = (x1, y1, x2, y2)
+            if verbose:
+                logger.info(
+                    "crop[%d]: bbox=(%d,%d,%d,%d) size=%dx%d conf=%.3f",
+                    idx, x1, y1, x2, y2, x2 - x1, y2 - y1, conf,
+                )
 
-            lp = _ocr_with_rotations(models.ocr, crop, label="raw")
+            lp = _ocr_with_rotations(models.ocr, crop, label="raw", verbose=verbose)
             if lp != UNKNOWN:
                 logger.info("recognize_bbox -> %s (crop[%d], raw)", lp, idx)
                 return RecognitionResult(plate=lp, bbox=bbox, confidence=conf)
 
             if settings.ocr_preprocess:
                 lp = _ocr_with_rotations(
-                    models.ocr, enhance_for_ocr(crop), label="prep"
+                    models.ocr, enhance_for_ocr(crop), label="prep", verbose=verbose
                 )
                 if lp != UNKNOWN:
                     logger.info("recognize_bbox -> %s (crop[%d], preprocessed)", lp, idx)
@@ -152,12 +160,14 @@ def recognize_best_with_bbox(models: LoadedModels, img_bgr: np.ndarray) -> Recog
                     models.ocr,
                     enhance_for_ocr(crop, invert=True),
                     label="prep-inv",
+                    verbose=verbose,
                 )
                 if lp != UNKNOWN:
                     logger.info("recognize_bbox -> %s (crop[%d], preprocessed+inverted)", lp, idx)
                     return RecognitionResult(plate=lp, bbox=bbox, confidence=conf)
 
-        logger.info("recognize_bbox -> unknown (all candidates exhausted)")
+        if verbose:
+            logger.info("recognize_bbox -> unknown (all candidates exhausted)")
         return RecognitionResult(plate=UNKNOWN)
 
 

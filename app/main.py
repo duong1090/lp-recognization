@@ -128,7 +128,7 @@ async def ws_rtsp(websocket: WebSocket) -> None:
             last_id = frame_id
             t0 = time.perf_counter()
             result = await run_in_threadpool(
-                pipeline.recognize_best_with_bbox, app.state.models, frame
+                pipeline.recognize_best_with_bbox, app.state.models, frame, verbose=False
             )
             h, w = frame.shape[:2]
             msg = {
