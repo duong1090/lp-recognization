@@ -1,4 +1,5 @@
 import logging
+import re
 from dataclasses import dataclass
 from typing import List, Tuple, Optional
 
@@ -17,6 +18,20 @@ from function.utils_rotate import deskew
 logger = logging.getLogger("lp-service.pipeline")
 
 UNKNOWN = "unknown"
+
+# Vietnamese plate: 2-digit province + 1-2 letter series + numeric tail
+# e.g. "51A12345", "29AB1234", "51A-12345"
+_PLATE_RE = re.compile(r'^(\d{2}[A-Z]{1,2}-?)(.+)$')
+
+
+def _refine_plate(plate: str) -> str:
+    """Fix common OCR misreads in the numeric tail: B→8, D→0."""
+    if plate == UNKNOWN:
+        return plate
+    m = _PLATE_RE.match(plate)
+    if not m:
+        return plate
+    return m.group(1) + m.group(2).replace('B', '8').replace('D', '0')
 
 
 @dataclass
@@ -42,7 +57,7 @@ def _ocr_with_rotations(ocr, crop: np.ndarray, *, label: str, verbose: bool = Tr
                     label, change_contrast, center_thres, cw, ch, lp,
                 )
             if lp != UNKNOWN:
-                return lp
+                return _refine_plate(lp)
     return UNKNOWN
 
 
@@ -58,7 +73,7 @@ def recognize_best(models: LoadedModels, img_bgr: np.ndarray) -> str:
 
         if df.empty:
             # Original pipeline: fall back to OCR on the whole frame.
-            lp = read_plate(models.ocr, img_bgr)
+            lp = _refine_plate(read_plate(models.ocr, img_bgr))
             logger.info("recognize -> %s (whole-frame fallback)", lp)
             return lp
 
@@ -119,7 +134,7 @@ def recognize_best_with_bbox(
         df = plates.pandas().xyxy[0]
 
         if df.empty:
-            lp = read_plate(models.ocr, img_bgr)
+            lp = _refine_plate(read_plate(models.ocr, img_bgr))
             return RecognitionResult(plate=lp)
 
         # Only reached when at least one candidate found — always log this
